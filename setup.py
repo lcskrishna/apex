@@ -138,7 +138,21 @@ if "--cuda_ext" in sys.argv:
                                                           # '--resource-usage',
                                                           '--use_fast_math'] + version_dependent_macros}))
         else:
-            print ("INFO: Skipping Multitensor apply extension")
+            print ("INFO: Building Multitensor apply extension")
+            ext_modules.append(
+                CUDAExtension(name='amp_C',
+                              sources=['csrc/amp_C_frontend.cpp',
+                                       'csrc/hip/multi_tensor_sgd_kernel.hip',
+                                       'csrc/hip/multi_tensor_scale_kernel.hip',
+                                       'csrc/hip/multi_tensor_axpby_kernel.hip',
+                                       'csrc/hip/multi_tensor_l2norm_kernel.hip',
+                                       'csrc/hip/multi_tensor_lamb_stage_1.hip',
+                                       'csrc/hip/multi_tensor_lamb_stage_2.hip',
+                                       'csrc/hip/multi_tensor_adam.hip',
+                                       'csrc/hip/multi_tensor_novograd.hip',
+                                       'csrc/hip/multi_tensor_lamb.hip'],
+                              extra_compile_args={'cxx' : ['-O3'] + version_dependent_macros,
+                                                  'nvcc': []}))
 
         if not is_rocm_pytorch:
             ext_modules.append(
