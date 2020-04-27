@@ -115,7 +115,9 @@ if "--cuda_ext" in sys.argv:
 
         if is_rocm_pytorch:
             import shutil
-            hipify_python.hipify(project_directory=this_dir, output_directory=this_dir, includes="csrc/*", show_detailed=True, is_pytorch_extension=True)
+            with hipify_python.GeneratedFileCleaner(keep_intermediates=True) as clean_ctx:
+                hipify_python.hipify(project_directory=this_dir, output_directory=this_dir, includes="csrc/*",
+                                        show_detailed=True, is_pytorch_extension=True, clean_ctx=clean_ctx)
             shutil.copy("csrc/compat.h", "csrc/hip/compat.h")
             shutil.copy("csrc/type_shim.h", "csrc/hip/type_shim.h")
 
