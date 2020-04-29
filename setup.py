@@ -190,12 +190,15 @@ if "--cuda_ext" in sys.argv:
             #                  extra_compile_args={'cxx' : ['-O3'] + version_dependent_macros,
             print ("Skipping layernorm")
 
-        ext_modules.append(
-            CUDAExtension(name='mlp_cuda',
-                          sources=['csrc/mlp.cpp',
-                                   'csrc/mlp_cuda.cu'],
-                          extra_compile_args={'cxx': ['-O3'] + version_dependent_macros,
-                                              'nvcc':['-O3'] + version_dependent_macros}))
+        if not is_rocm_pytorch:
+            ext_modules.append(
+                CUDAExtension(name='mlp_cuda',
+                            sources=['csrc/mlp.cpp',
+                                    'csrc/mlp_cuda.cu'],
+                            extra_compile_args={'cxx': ['-O3'] + version_dependent_macros,
+                                                'nvcc':['-O3'] + version_dependent_macros}))
+        else:
+            print ("Skipping MLP")
 
 if "--bnp" in sys.argv:
     from torch.utils.cpp_extension import CUDAExtension
