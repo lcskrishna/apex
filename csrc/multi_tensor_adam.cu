@@ -97,7 +97,11 @@ struct AdamFunctor
           r_v[ii] = beta2 * r_v[ii] + (1-beta2) * r_g[ii] * r_g[ii];
           MATH_T next_m_unbiased = r_m[ii] / beta1_correction;
           MATH_T next_v_unbiased = r_v[ii] / beta2_correction;
+#ifdef __HIP_PLATFORM_HCC__
           MATH_T denom = sqrtf(next_v_unbiased + epsilon);
+#else
+          MATH_T denom = sqrtf(next_v_unbiased) + epsilon;
+#endif
           MATH_T update = next_m_unbiased / denom;
           r_p[ii] = r_p[ii] - (lr * update);
         }
@@ -106,7 +110,11 @@ struct AdamFunctor
           r_v[ii] = beta2 * r_v[ii] + (1-beta2) * r_g[ii] * r_g[ii];
           MATH_T next_m_unbiased = r_m[ii] / beta1_correction;
           MATH_T next_v_unbiased = r_v[ii] / beta2_correction;
+#ifdef __HIP_PLATFORM_HCC__
           MATH_T denom = sqrtf(next_v_unbiased + epsilon);
+#else
+          MATH_T denom = sqrtf(next_v_unbiased) + epsilon;
+#endif
           MATH_T update = (next_m_unbiased / denom) + (decay * r_p[ii]);
           r_p[ii] = r_p[ii] - (lr * update);
         }
