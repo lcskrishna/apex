@@ -142,7 +142,7 @@ __device__ __forceinline__ void warp_reduce_mean_m2n(T &mean, T &m2n, int &num)
     auto num_new = __shfl_down_sync(0xffffffff, num, i);
     auto mean_new = __shfl_down_sync(0xffffffff, mean, i);
     auto m2n_new = __shfl_down_sync(0xffffffff, m2n, i);
-    welford_merge_element<T, int>(num, mean, m2n, num_new, mean_new, m2n_new);
+    welford_merge_element(num, mean, m2n, num_new, mean_new, m2n_new);
 #endif
   }
 }
