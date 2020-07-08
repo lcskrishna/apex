@@ -47,7 +47,11 @@ __device__ __forceinline__ T warp_reduce_sum(T val)
 {
   #pragma unroll
   for(int i = WARP_SIZE/2; i > 0; i >>= 1)
+#if defined __HIP_PLATFORM_HCC__
+    val = val + __shfl_down(0xffffffff, val, i);
+#else
     val = val + __shfl_down_sync(0xffffffff, val, i);
+#endif
   return val;
 }
 
@@ -129,10 +133,17 @@ __device__ __forceinline__ void warp_reduce_mean_m2n(T &mean, T &m2n, int &num)
 {
   #pragma unroll
   for(int i = WARP_SIZE/2; i > 0; i >>= 1) {
+#if defined __HIP_PLATFORM_HCC__
+    auto num_new = __shfl_down(0xffffffff, num, i);
+    auto mean_new = __shfl_down(0xffffffff, mean, i);
+    auto m2n_new = __shfl_down(0xffffffff, m2n, i);
+    welford_merge_element<T, int>(num, mean, m2n, num_new, mean_new, m2n_new);
+#else
     auto num_new = __shfl_down_sync(0xffffffff, num, i);
     auto mean_new = __shfl_down_sync(0xffffffff, mean, i);
     auto m2n_new = __shfl_down_sync(0xffffffff, m2n, i);
-    welford_merge_element(num, mean, m2n, num_new, mean_new, m2n_new);
+    welford_merge_element<T, int>(num, mean, m2n, num_new, mean_new, m2n_new);
+#endif
   }
 }
 
