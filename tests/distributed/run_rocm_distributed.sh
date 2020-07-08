@@ -29,5 +29,9 @@ rm rank1model.pth
 rm rank0master.pth
 rm rank1master.pth
 
-python3.6 synced_batchnorm/python_single_gpu_unit_test.py
+## Run the Sync BN Tests.
+echo "Running syncbn tests"
 python3.6 -m torch.distributed.launch --nproc_per_node=2 synced_batchnorm/two_gpu_test_different_batch_size.py --apex
+echo "Running syncbn python only tests"
+python3.6 synced_batchnorm/python_single_gpu_unit_test.py
+
