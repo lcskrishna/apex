@@ -62,7 +62,11 @@ std::vector<at::Tensor> mlp_forward(int use_bias, int activation, std::vector<at
   // create output/workspace tensor
   // TODO(deyuf): just get buffer?
   auto out = at::empty({batch_size, output_features.back()}, inputs[0].type());
+#ifdef __HIP_PLATFORM_HCC__
+  auto reserved_space = at::empty({static_cast<long>(reserved_size)}, inputs[0].type());
+#else
   auto reserved_space = at::empty({reserved_size}, inputs[0].type());
+#endif
 
   AT_DISPATCH_FLOATING_TYPES_AND_HALF(inputs[0].type(), "mlp_forward", [&] {
     std::vector<scalar_t*> w_ptr;
@@ -134,7 +138,11 @@ std::vector<at::Tensor> mlp_backward(
         get_mlp_bp_workspace_in_bytes<scalar_t>(batch_size, num_layers, output_features.data());
 
     // auto work_space = at::empty({work_size*4}, at::kByte);
+#ifdef __HIP_PLATFORM_HCC__
+    auto work_space = at::empty({static_cast<long>(work_size / sizeof(scalar_t))}, inputs[0].type());
+#else
     auto work_space = at::empty({work_size / sizeof(scalar_t)}, inputs[0].type());
+#endif
 
     auto result = mlp_bp<scalar_t>(
         inputs[0].data_ptr<scalar_t>(),
