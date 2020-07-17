@@ -7,6 +7,7 @@ import torch
 from torch import nn
 
 from apex.mlp import MLP
+from apex.testing.common_utils import skipIfRocm
 
 batch_size = 1024
 mlp_sizes = [480, 1024, 1024, 512, 256, 1]
@@ -160,7 +161,7 @@ class TestMLP(unittest.TestCase):
             ref_mlp[0].weight.grad.detach().cpu().numpy(),
             atol=1e-7, rtol=1e-5)
 
-
+    @skipIfRocm
     def test_performance_half(self):
         mlp = MLP(mlp_sizes).cuda().half()
 
