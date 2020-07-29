@@ -11,20 +11,24 @@ MODULE = torch.Tensor
 #     MODULE = torch.autograd.Variable
 
 
-FP16_FUNCS = [
+FP16_FUNCS = compat.filter_attrs(MODULE, [
+    '__matmul__',
+])
+
+BFLOAT16_FUNCS = [
     '__matmul__',
 ]
 
-FP32_FUNCS = [
+FP32_FUNCS = compat.filter_attrs(MODULE, [
     '__ipow__',
     '__pow__',
     '__rpow__',
 
     # Cast to fp32 before transfer to CPU
     'cpu',
-]
+])
 
-CASTS = [
+CASTS = compat.filter_attrs(MODULE, [
     '__add__',
     '__div__',
     '__eq__',
@@ -46,7 +50,7 @@ CASTS = [
     '__rtruediv__',
     '__sub__',
     '__truediv__',
-]
+])
 
 # None of these, but here to make code cleaner.
 SEQUENCE_CASTS = []
@@ -56,7 +60,7 @@ SEQUENCE_CASTS = []
 # between `torch` and `torch.Tensor` (and check with `hasattr`,
 # because a few random ones aren't defined on Tensor)
 _self_mod = importlib.import_module(__name__)
-for attrname in ['FP16_FUNCS', 'FP32_FUNCS', 'CASTS', 'SEQUENCE_CASTS']:
+for attrname in ['FP16_FUNCS', 'BFLOAT16_FUNCS', 'FP32_FUNCS', 'CASTS', 'SEQUENCE_CASTS']:
     lst = getattr(_self_mod, attrname)
     for fn in getattr(torch_overrides, attrname):
         if hasattr(MODULE, fn):

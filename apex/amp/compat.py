@@ -28,7 +28,8 @@ def is_floating_point(x):
         torch_type = x.type()
         return torch_type.endswith('FloatTensor') or \
             torch_type.endswith('HalfTensor') or \
-            torch_type.endswith('DoubleTensor')
+            torch_type.endswith('DoubleTensor') or \
+            torch_type.endswith('BFloat16Tensor')
     except AttributeError:
         return False
 
@@ -40,3 +41,7 @@ def scalar_python_val(x):
             return x.data[0]
         else:
             return x[0]
+
+# Accounts for the possibility that some ops may be removed from a namespace.
+def filter_attrs(module, attrs):
+    return list(attrname for attrname in attrs if hasattr(module, attrname))

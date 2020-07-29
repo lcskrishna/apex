@@ -13,13 +13,24 @@
 #define BLOCK_SIZE 512
 #define ILP 4
 
+template<typename T>
+__device__ __forceinline__ bool is_aligned(T* p){
+  return ((uint64_t)p) % (ILP*sizeof(T)) == 0;
+}
+
+template<typename T>
+__device__ __forceinline__ void load_store(T* dst, T* src, int dst_offset, int src_offset){
+  typedef typename std::aligned_storage<ILP*sizeof(T), ILP*alignof(T)>::type LT;
+  ((LT*)dst)[dst_offset] = ((LT*)src)[src_offset];
+}
+
 template<typename x_t>
 struct L2NormFunctor
 {
   __device__ __forceinline__ void operator()(
     int chunk_size,
     volatile int* noop_gmem,
-    TensorListMetadata<1>& tl,
+    TensorListMetadata<1>* tl,
     float* output,
     float* output_per_tensor,
     bool per_tensor,
@@ -29,11 +40,11 @@ struct L2NormFunctor
     // if(*noop_gmem == 1)
     //   return;
 
-    int tensor_loc = tl.block_to_tensor[blockIdx.x];
-    int chunk_idx = tl.block_to_chunk[blockIdx.x];
-    int n = tl.sizes[tensor_loc];
+    int tensor_loc = tl->block_to_tensor[blockIdx.x];
+    int chunk_idx = tl->block_to_chunk[blockIdx.x];
+    int n = tl->sizes[tensor_loc];
 
-    x_t* x = (x_t*)tl.addresses[0][tensor_loc];
+    x_t* x = (x_t*)tl->addresses[0][tensor_loc];
     x += chunk_idx*chunk_size;
 
     n -= chunk_idx*chunk_size;
@@ -41,19 +52,41 @@ struct L2NormFunctor
     __shared__ float s_vals[512];
 
     float vals[ILP]; // = {0}; // this probably works too but I want to be sure...
+    x_t r_x[ILP];
     for(int i = 0; i < ILP; i++)
-      vals[i] = 0.f;
-
-    for(int i_start = 0; i_start < n && i_start < chunk_size; i_start += blockDim.x*ILP)
     {
-      #pragma unroll
-      for(int ii = 0; ii < ILP; ii++)
+      vals[i] = 0.f;
+      r_x[i] = 0;
+    }
+
+    // to make things simple, we put aligned case in a different code path
+    if(n % ILP == 0 && chunk_size % ILP == 0 && is_aligned(x))
+    {
+      for(int i_start = threadIdx.x; i_start*ILP < n && i_start*ILP < chunk_size; i_start += blockDim.x)
       {
-        int i = i_start + threadIdx.x + ii*blockDim.x;
-        if(i < n && i < chunk_size)
+        // load
+        load_store(r_x, x, 0 , i_start);
+#pragma unroll
+        for(int ii = 0; ii < ILP; ii++)
         {
-          float next = static_cast<float>(x[i]);
+          float next = static_cast<float>(r_x[ii]);
           vals[ii] += next*next;
+        }
+      }
+    }
+    else
+    {
+      for(int i_start = 0; i_start < n && i_start < chunk_size; i_start += blockDim.x*ILP)
+      {
+#pragma unroll
+        for(int ii = 0; ii < ILP; ii++)
+        {
+          int i = i_start + threadIdx.x + ii*blockDim.x;
+          if(i < n && i < chunk_size)
+          {
+            float next = static_cast<float>(x[i]);
+            vals[ii] += next*next;
+          }
         }
       }
     }
@@ -70,7 +103,7 @@ struct L2NormFunctor
         *noop_gmem = 1; // Blindly fire off a write.  These will race but that's ok.
       output[blockIdx.x] += final;
       if(per_tensor)
-        output_per_tensor[(tl.start_tensor_this_launch + tensor_loc)*max_chunks_per_tensor + chunk_idx] = final;
+        output_per_tensor[(tl->start_tensor_this_launch + tensor_loc)*max_chunks_per_tensor + chunk_idx] = final;
     }
   }
 };
@@ -82,7 +115,7 @@ struct MaxNormFunctor
   __device__ __forceinline__ void operator()(
     int chunk_size,
     volatile int* noop_gmem,
-    TensorListMetadata<1>& tl,
+    TensorListMetadata<1>* tl,
     float* output,
     float* output_per_tensor,
     bool per_tensor,
@@ -92,11 +125,11 @@ struct MaxNormFunctor
     // if(*noop_gmem == 1)
     //   return;
 
-    int tensor_loc = tl.block_to_tensor[blockIdx.x];
-    int chunk_idx = tl.block_to_chunk[blockIdx.x];
-    int n = tl.sizes[tensor_loc];
+    int tensor_loc = tl->block_to_tensor[blockIdx.x];
+    int chunk_idx = tl->block_to_chunk[blockIdx.x];
+    int n = tl->sizes[tensor_loc];
 
-    x_t* x = (x_t*)tl.addresses[0][tensor_loc];
+    x_t* x = (x_t*)tl->addresses[0][tensor_loc];
     x += chunk_idx*chunk_size;
 
     n -= chunk_idx*chunk_size;
@@ -104,19 +137,41 @@ struct MaxNormFunctor
     __shared__ float s_vals[512];
 
     float vals[ILP]; // = {0}; // this probably works too but I want to be sure...
+    x_t r_x[ILP];
     for(int i = 0; i < ILP; i++)
-      vals[i] = 0.f;
-
-    for(int i_start = 0; i_start < n && i_start < chunk_size; i_start += blockDim.x*ILP)
     {
-      #pragma unroll
-      for(int ii = 0; ii < ILP; ii++)
+      vals[i] = 0.f;
+      r_x[i] = 0;
+    }
+
+    // to make things simple, we put aligned case in a different code path
+    if(n % ILP == 0 && chunk_size % ILP == 0 && is_aligned(x))
+    {
+      for(int i_start = threadIdx.x; i_start*ILP < n && i_start*ILP < chunk_size; i_start += blockDim.x)
       {
-        int i = i_start + threadIdx.x + ii*blockDim.x;
-        if(i < n && i < chunk_size)
+        // load
+        load_store(r_x, x, 0 , i_start);
+#pragma unroll
+        for(int ii = 0; ii < ILP; ii++)
         {
-          float next = static_cast<float>(x[i]);
+          float next = static_cast<float>(r_x[ii]);
           vals[ii] = fmaxf(fabsf(vals[ii]), fabsf(next));
+        }
+      }
+    }
+    else
+    {
+      for(int i_start = 0; i_start < n && i_start < chunk_size; i_start += blockDim.x*ILP)
+      {
+#pragma unroll
+        for(int ii = 0; ii < ILP; ii++)
+        {
+          int i = i_start + threadIdx.x + ii*blockDim.x;
+          if(i < n && i < chunk_size)
+          {
+            float next = static_cast<float>(x[i]);
+            vals[ii] = fmaxf(fabsf(vals[ii]), fabsf(next));
+          }
         }
       }
     }
@@ -133,13 +188,17 @@ struct MaxNormFunctor
         *noop_gmem = 1; // Blindly fire off a write.  These will race but that's ok.
       output[blockIdx.x] = fmaxf(fabsf(output[blockIdx.x]), fabsf(final));
       if(per_tensor)
-        output_per_tensor[(tl.start_tensor_this_launch + tensor_loc)*max_chunks_per_tensor + chunk_idx] = final;
+        output_per_tensor[(tl->start_tensor_this_launch + tensor_loc)*max_chunks_per_tensor + chunk_idx] = final;
     }
   }
 };
 
 
-__global__ void cleanup(
+__global__ void
+#ifdef __HIP_PLATFORM_HCC__
+__launch_bounds__(1024)
+#endif
+cleanup(
   float* output,
   float* output_per_tensor,
   float* ret,
@@ -176,7 +235,11 @@ __global__ void cleanup(
   }
 }
 
-__global__ void cleanup_v2(
+__global__ void
+#ifdef __HIP_PLATFORM_HCC__
+__launch_bounds__(1024)
+#endif
+cleanup_v2(
   float* output,
   float* output_per_tensor,
   float* ret,
@@ -267,7 +330,7 @@ std::tuple<at::Tensor, at::Tensor> multi_tensor_l2norm_cuda(
     ret_per_tensor = at::empty({0}, float_options);
   }
 
-  DISPATCH_FLOAT_AND_HALF(tensor_lists[0][0].scalar_type(), 0, "multi_tensor_l2norm_cuda",
+  DISPATCH_FLOAT_AND_HALF_AND_BFLOAT16(tensor_lists[0][0].scalar_type(), 0, "multi_tensor_l2norm_cuda",
     multi_tensor_apply<1>(
       BLOCK_SIZE,
       chunk_size,
@@ -336,7 +399,7 @@ void multi_tensor_norm_out_cuda(
   output_per_tensor = at::zeros({ntensors*max_chunks_per_tensor}, float_options);
 
   if (norm_type == 0) {
-    DISPATCH_FLOAT_AND_HALF(
+    DISPATCH_FLOAT_AND_HALF_AND_BFLOAT16(
       tensor_lists[0][0].scalar_type(), 0, "multi_tensor_maxnorm_cuda",
       multi_tensor_apply<1>(
         BLOCK_SIZE,
@@ -350,7 +413,7 @@ void multi_tensor_norm_out_cuda(
         max_chunks_per_tensor);)
   }
   else {
-    DISPATCH_FLOAT_AND_HALF(
+    DISPATCH_FLOAT_AND_HALF_AND_BFLOAT16(
       tensor_lists[0][0].scalar_type(), 0, "multi_tensor_l2norm_cuda",
       multi_tensor_apply<1>(
         BLOCK_SIZE,
