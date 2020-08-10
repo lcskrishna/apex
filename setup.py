@@ -318,18 +318,31 @@ if "--deprecated_fused_lamb" in sys.argv:
     from torch.utils.cpp_extension import BuildExtension
     cmdclass['build_ext'] = BuildExtension
 
-    if torch.utils.cpp_extension.CUDA_HOME is None:
+    is_rocm_pytorch = check_if_rocm_pytorch()
+
+    if torch.utils.cpp_extension.CUDA_HOME is None and (not is_rocm_pytorch):
         raise RuntimeError("--deprecated_fused_lamb was requested, but nvcc was not found.  Are you sure your environment has nvcc available?  If you're installing within a container from https://hub.docker.com/r/pytorch/pytorch, only images whose names contain 'devel' will provide nvcc.")
     else:
-        ext_modules.append(
-            CUDAExtension(name='fused_lamb_cuda',
-                          sources=['apex/contrib/csrc/optimizers/fused_lamb_cuda.cpp',
-                                   'apex/contrib/csrc/optimizers/fused_lamb_cuda_kernel.cu',
-                                   'csrc/multi_tensor_l2norm_kernel.cu'],
-                          include_dirs=[os.path.join(this_dir, 'csrc')],
-                          extra_compile_args={'cxx': ['-O3',] + version_dependent_macros,
-                                              'nvcc':['-O3',
-                                                      '--use_fast_math'] + version_dependent_macros}))
+        if not is_rocm_pytorch:
+            ext_modules.append(
+                CUDAExtension(name='fused_lamb_cuda',
+                              sources=['apex/contrib/csrc/optimizers/fused_lamb_cuda.cpp',
+                                       'apex/contrib/csrc/optimizers/fused_lamb_cuda_kernel.cu',
+                                       'csrc/multi_tensor_l2norm_kernel.cu'],
+                              include_dirs=[os.path.join(this_dir, 'csrc')],
+                              extra_compile_args={'cxx': ['-O3',] + version_dependent_macros,
+                                                  'nvcc':['-O3',
+                                                          '--use_fast_math'] + version_dependent_macros}))
+        else:
+            print ("INFO: Building deprecated fused lamb.")
+            ext_modules.append(
+                CUDAExtension(name='fused_lamb_cuda',
+                              sources=['apex/contrib/csrc/optimizers/fused_lamb_cuda.cpp',
+                                       'apex/contrib/csrc/optimizers/hip/fused_lamb_hip_kernel.hip',
+                                       'csrc/hip/multi_tensor_l2norm_kernel.hip'],
+                              include_dirs=[os.path.join(this_dir, 'csrc/hip')],
+                              extra_compile_args={'cxx': ['-O3',] + version_dependent_macros,
+                                                  'nvcc':[]}))
 
 # Check, if ATen/CUDAGenerator.h is found, otherwise use the new ATen/CUDAGeneratorImpl.h, due to breaking change in https://github.com/pytorch/pytorch/pull/36026
 generator_flag = []
