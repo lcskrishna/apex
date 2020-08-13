@@ -203,7 +203,9 @@ blockReduce(AccumT* smem, AccumT val,
       for (int i = 0; i < 32; ++i) {
         warpVal = r(warpVal, smem[lane * 32 + i]);
       }
+#ifndef __HIP_PLATFORM_HCC__
       __syncwarp(mask);
+#endif
       smem[lane] = warpVal;
     }
   }
@@ -258,7 +260,9 @@ blockReduce(AccumT* smem,
         warpVal1 = r1(warpVal1, smem[lane * 32 + i]);
         warpVal2 = r2(warpVal2, smem[lane * 32 + i + blockDim.x]);
       }
+#ifndef __HIP_PLATFORM_HCC__
       __syncwarp(mask);
+#endif
       smem[lane] = warpVal1;
       smem[lane + blockDim.x] = warpVal2;
     }
