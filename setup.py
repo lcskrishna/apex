@@ -278,7 +278,7 @@ if "--xentropy" in sys.argv:
                                    'apex/contrib/csrc/xentropy/xentropy_kernel.cu'],
                           include_dirs=[os.path.join(this_dir, 'csrc')],
                           extra_compile_args={'cxx': ['-O3'] + version_dependent_macros,
-                                              'nvcc':['-O3'] + version_dependent_macros}]]))
+                                              'nvcc':['-O3'] + version_dependent_macros}))
 
 if "--deprecated_fused_adam" in sys.argv:
     from torch.utils.cpp_extension import CUDAExtension
