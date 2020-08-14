@@ -308,8 +308,7 @@ if "--deprecated_fused_adam" in sys.argv:
                               sources=['apex/contrib/csrc/optimizers/fused_adam_cuda.cpp',
                                        'apex/contrib/csrc/optimizers/hip/fused_adam_hip_kernel.hip'],
                               include_dirs=[os.path.join(this_dir, 'csrc/hip')],
-                              extra_compile_args={'cxx': ['-O3',] + version_dependent_macros,
-                                                  'nvcc':['-O3',] + version_dependent_macros}))
+                              extra_compile_args=['-O3'] + version_dependent_macros))
 
 if "--deprecated_fused_lamb" in sys.argv:
     from torch.utils.cpp_extension import CUDAExtension
@@ -341,8 +340,7 @@ if "--deprecated_fused_lamb" in sys.argv:
                                        'apex/contrib/csrc/optimizers/hip/fused_lamb_hip_kernel.hip',
                                        'csrc/hip/multi_tensor_l2norm_kernel.hip'],
                               include_dirs=[os.path.join(this_dir, 'csrc/hip')],
-                              extra_compile_args={'cxx': ['-O3',] + version_dependent_macros,
-                                                  'nvcc':[]}))
+                              extra_compile_args=['-O3'] + version_dependent_macros))
 
 # Check, if ATen/CUDAGenerator.h is found, otherwise use the new ATen/CUDAGeneratorImpl.h, due to breaking change in https://github.com/pytorch/pytorch/pull/36026
 generator_flag = []
