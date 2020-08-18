@@ -266,9 +266,7 @@ blockReduce(AccumT* smem,
         warpVal1 = r1(warpVal1, smem[lane * WARP_SIZE + i]);
         warpVal2 = r2(warpVal2, smem[lane * WARP_SIZE + i + blockDim.x]);
       }
-#ifndef __HIP_PLATFORM_HCC__
-      __syncwarp(mask);
-#endif
+      SYNCWARP(mask);
       smem[lane] = warpVal1;
       smem[lane + blockDim.x] = warpVal2;
     }
