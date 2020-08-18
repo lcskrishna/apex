@@ -87,8 +87,10 @@
 
 #ifdef __HIP_PLATFORM_HCC__
 #define WARP_SIZE 64
+#define SYNCWARP(mask)
 #else
 #define WARP_SIZE 32
+#define SYNCWARP(mask) __syncwarp(mask)
 #endif
 
 using Tensor = at::Tensor;
@@ -209,9 +211,7 @@ blockReduce(AccumT* smem, AccumT val,
       for (int i = 0; i < WARP_SIZE; ++i) {
         warpVal = r(warpVal, smem[lane * WARP_SIZE + i]);
       }
-#ifndef __HIP_PLATFORM_HCC__
-      __syncwarp(mask);
-#endif
+      SYNCWARP(mask);
       smem[lane] = warpVal;
     }
   }
